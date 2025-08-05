@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>Echo the Parrot</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 2em; }
+    button { font-size: 1.8em; margin: 0.5em; padding: 0.8em 1.2em; transition: background-color 0.3s ease; }
+    button.recording { background-color: #ff4444; color: white; }
+    #word-container { display: flex; align-items: center; justify-content: center; margin: 2em 0; gap: 1em; }
+    #word { font-size: 2em; }
+    #feedback { font-size: 1.5em; color: green; margin-top: 1em; }
+  </style>
+</head>
+<body>
+
+  <h1>Echo the Parrot 🦜</h1>
+  <div id="word-container">
+    <div id="word">انظر واستمع...</div>
+  </div>
+  <button id="recordBtn" onclick="startRepeating()">🎤 قلها بنفسك</button>
+  <div id="feedback"></div>
+
+  <script>
+    const words = [
+      "تفاحة", "قطة", "أنا أحب اللعب", "الماء بارد", "الشمس مشرقة",
+      "أريد أن أذهب إلى الحديقة", "السيارة سريعة", "الكرة حمراء", "أحب أمي", "البيت كبير",
+      "أنا أقرأ كتابًا", "الجو جميل", "السماء زرقاء", "هل تحب المدرسة؟", "أنا سعيد اليوم",
+      "الطاولة خشبية", "الولد يركض", "البنت ترسم", "نأكل في المطبخ", "أشرب الحليب",
+      "العصفور يطير", "الكلب نائم", "النافذة مفتوحة", "هذا قلمي", "الساعة السادسة"
+    ];
+    let currentWord = "";
+    let currentWordIndex = -1;
+    let attempts = 0;
+    let maxAttempts = 3;
+
+    const wordEl = document.getElementById("word");
+    const feedbackEl = document.getElementById("feedback");
+    const recordBtn = document.getElementById("recordBtn");
+
+    function pickNewWord() {
+      let newIndex;
+      do {
+        newIndex = Math.floor(Math.random() * words.length);
+      } while (newIndex === currentWordIndex && words.length > 1);
+      
+      currentWordIndex = newIndex;
+      currentWord = words[currentWordIndex];
+      wordEl.textContent = currentWord;
+      feedbackEl.textContent = "";
+      attempts = 0;
+
+      // Auto-play the word
+      const utterance = new SpeechSynthesisUtterance(currentWord);
+      utterance.lang = "ar-SA";
+      speechSynthesis.speak(utterance);
+    }
+
+    function normalizeArabic(text) {
+      return text
+        .replace(/[\u064B-\u065F]/g, '')     // Remove tashkeel
+        .replace(/[إأآا]/g, 'ا')              // Normalize hamza
+        .replace(/ى/g, 'ي')                   // Normalize alef maqsura
+        .replace(/ؤ/g, 'و')                   // Normalize waw forms
+        .replace(/ئ/g, 'ي')                   // Normalize yaa forms
+        .replace(/ة/g, 'ه')                   // Treat taa marbuta as ha
+        .replace(/\s+/g, '')                  // Remove all whitespace
+        .trim();
+    }
+
+    function startRepeating() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert("متصفحك لا يدعم التعرف على الصوت 😢");
+        return;
+      }
+
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = "ar-SA";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.continuous = false; // Stop auto-restarting
+
+      recordBtn.classList.add('recording');
+      recordBtn.textContent = "🎤 أستمع...";
+
+      recognition.start();
+
+      recognition.onresult = function(event) {
+        const userSaid = event.results[0][0].transcript.trim();
+
+        const target = normalizeArabic(currentWord);
+        const spoken = normalizeArabic(userSaid);
+
+        attempts++;
+
+        if (spoken === target) {
+          feedbackEl.textContent = "أحسنت! 🥳 انتقال إلى كلمة جديدة...";
+          setTimeout(() => {
+            pickNewWord();
+          }, 2000);
+        } else if (attempts >= maxAttempts) {
+          feedbackEl.textContent = `الكلمة كانت: "${currentWord}" - انتقال لكلمة جديدة...`;
+          setTimeout(() => {
+            pickNewWord();
+          }, 3000);
+        } else {
+          const remaining = maxAttempts - attempts;
+          feedbackEl.textContent = `أعد المحاولة! سمعت: "${userSaid}" (${remaining} محاولات متبقية)`;
+        }
+
+        recordBtn.classList.remove('recording');
+        recordBtn.textContent = "🎤 قلها بنفسك";
+      };
+
+      recognition.onerror = function(event) {
+        feedbackEl.textContent = "حدث خطأ في التعرف الصوتي. حاول مرة أخرى.";
+        recordBtn.classList.remove('recording');
+        recordBtn.textContent = "🎤 قلها بنفسك";
+      };
+
+      recognition.onend = function() {
+        recordBtn.classList.remove('recording');
+        recordBtn.textContent = "🎤 قلها بنفسك";
+      };
+    }
+
+    // Start with a word
+    pickNewWord();
+  </script>
+</body>
+</html>
